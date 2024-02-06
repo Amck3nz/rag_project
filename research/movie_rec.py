@@ -18,9 +18,9 @@ db = client.sample_mflix
 collection = db.movies
 
 
-
 # Create/store movie plot data field embeddings
 def generate_embedding(text:str) -> list[float]:
+    
     response = requests.post(embedding_url,
                              headers={"Authorization": f"Bearer {hf_token}"},
                              json={"inputs": text}
@@ -33,7 +33,8 @@ def generate_embedding(text:str) -> list[float]:
 
 
 
-#for entry in collection.find({'plot':{'$exists': True}}).limit(50):      # For documents in our collection, find items where the plot exists (just 50 b/c rate limits & time)
+
+#for entry in collection.find({'plot':{'$exists': True}}).limit(50):     # For documents in our collection, find items where the plot exists (just 50 b/c rate limits & time)
 #    entry['plot_embedding_hf'] = generate_embedding(entry['plot'])      # Add new plot embedding field to db
 #    collection.replace_one({'_id' : entry['_id']}, entry)               # Update info for that movie with the same info PLUS new embedding field (alternatively could creat new seperate collection for embeddings)
 #
@@ -56,3 +57,59 @@ for document in results:
 
 
 #print(generate_embedding("steak is the best food"))
+    
+
+
+#---------------------------------------------------------------- Open AI Version
+""" 
+import os
+import requests
+import pymongo
+import openai
+#from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+load_dotenv()
+
+mdb_uri= os.environ.get('MONGO_DB_CONNECT_STRING')
+
+# oepnai.api_key = os.environ.get('OPEN_AI_KEY')
+
+# Connect to Mondo DB
+client = pymongo.MongoClient(mdb_uri)
+db = client.sample_mflix
+collection = db.movies
+
+
+# Create/store movie plot data field embeddings
+def generate_embedding(text:str) -> list[float]:
+    
+    response = openai.Embedding.create(
+        model="text-embedding-ada-002",
+        input=text
+    )
+
+    return response['data'][0]['embedding']
+
+
+
+#for entry in collection.find({'plot':{'$exists': True}}).limit(50):     # For documents in our collection, find items where the plot exists (just 50 b/c rate limits & time)
+#    entry['plot_embedding_hf'] = generate_embedding(entry['plot'])      # Add new plot embedding field to db
+#    collection.replace_one({'_id' : entry['_id']}, entry)               # Update info for that movie with the same info PLUS new embedding field (alternatively could creat new seperate collection for embeddings)
+#
+
+#Vector Search (using mongo db collection vector search aggregation pipeline)
+query = "found footage horror movie where people explore a scary location"
+
+results = collection.aggregate([
+    {"$vectorSearch": {
+        "queryVector": generate_embedding(query),
+        "path": "plot_embedding",
+        "numCandidates":100,
+        "limit":5,
+        "index": "PlotSemanticSearch",
+    }}
+]);
+
+for document in results:
+    print(f"Movie Rec: {document['title']} | Plot: {document['plot']}\n")
+"""
